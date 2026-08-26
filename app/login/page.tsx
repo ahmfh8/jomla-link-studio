@@ -10,8 +10,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="login-page" dir="rtl">
       <section className="login-card">
-        <div className="login-mark">JL</div>
-        <p className="login-kicker">JOMLA LINK</p>
+        <div className="login-brand">
+          <img src="/jomlalink-symbol.svg" alt="شعار جملة لينك" />
+          <div>
+            <strong><span>Jomla</span> <em>Link</em></strong>
+            <small>جملة لينك</small>
+          </div>
+        </div>
         <h1>استوديو الكتالوج الذكي</h1>
         <p className="login-intro">سجّل الدخول للوصول إلى مساحة العمل الخاصة بك.</p>
 

@@ -7,37 +7,47 @@
   place-items: center;
   padding: 24px;
   background:
-    radial-gradient(circle at 15% 15%, rgba(20, 184, 166, 0.14), transparent 30%),
-    radial-gradient(circle at 85% 85%, rgba(37, 99, 235, 0.12), transparent 32%),
-    #07111f;
+    radial-gradient(circle at 18% 18%, rgba(0, 201, 167, 0.1), transparent 28%),
+    #181c1d;
   color: #eaf3f5;
 }
 .login-card {
   width: min(100%, 430px);
   padding: 38px;
-  border: 1px solid rgba(94, 234, 212, 0.22);
+  border: 1px solid rgba(0, 201, 167, 0.35);
   border-radius: 24px;
-  background: rgba(10, 24, 39, 0.92);
+  background: #0a2540;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
 }
-.login-mark {
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 20px;
+}
+.login-brand img {
   width: 58px;
   height: 58px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 20px;
-  border-radius: 17px;
-  background: linear-gradient(135deg, #14b8a6, #2563eb);
-  color: white;
-  font-size: 20px;
-  font-weight: 800;
+  object-fit: contain;
 }
-.login-kicker {
-  margin: 0 0 8px;
-  color: #5eead4;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+.login-brand strong,
+.login-brand small {
+  display: block;
+}
+.login-brand strong {
+  direction: ltr;
+  color: #fff;
+  font-family: "IBM Plex Sans", Arial, sans-serif;
+  font-size: 20px;
+}
+.login-brand strong em {
+  color: #00c9a7;
+  font-style: normal;
+}
+.login-brand small {
+  margin-top: 4px;
+  color: #dce2ea;
+  font-size: 11px;
 }
 .login-card h1 {
   margin: 0;
@@ -76,21 +86,21 @@
   border: 1px solid #2b4555;
   border-radius: 12px;
   outline: none;
-  background: #081624;
+  background: #102f4c;
   color: white;
   font-size: 16px;
 }
 .login-form input:focus {
-  border-color: #2dd4bf;
-  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.12);
+  border-color: #00c9a7;
+  box-shadow: 0 0 0 3px rgba(0, 201, 167, 0.12);
 }
 .login-form button {
   margin-top: 4px;
   padding: 14px 18px;
   border: 0;
   border-radius: 12px;
-  background: linear-gradient(135deg, #0f9f91, #2563eb);
-  color: white;
+  background: #00c9a7;
+  color: #0a2540;
   cursor: pointer;
   font-size: 16px;
   font-weight: 800;
