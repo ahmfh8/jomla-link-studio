@@ -796,11 +796,13 @@ export default function Home() {
                       ) : (
                         <span className={`status ${r.status}`} title={r.error}>
                           <i />
-                          {r.status === "processing"
-                            ? "جاري الإنشاء"
-                            : r.status === "error"
-                              ? "فشلت — أعد المحاولة"
-                              : "جاهزة للتعبئة"}
+                          <span>
+                            {r.status === "processing"
+                              ? "جاري الإنشاء"
+                              : r.status === "error"
+                                ? r.error || "فشلت — أعد المحاولة"
+                                : "جاهزة للتعبئة"}
+                          </span>
                         </span>
                       )}
                       <button
