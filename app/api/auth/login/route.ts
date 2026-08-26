@@ -1,29 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const SESSION_COOKIE = "jomla_studio_session";
-
-async function createSessionToken(username: string, password: string) {
-  const data = new TextEncoder().encode(
-    `${username}\u0000${password}\u0000jomla-link-studio`,
-  );
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-}
+import { STUDIO_EMAIL, verifyStudioCredentials } from "../../../../lib/auth";
+import { COOKIE_NAME, createSession, SESSION_SECONDS } from "../../../../lib/session";
 
 export async function POST(request: NextRequest) {
-  const configuredUsername = process.env.STUDIO_USERNAME;
-  const configuredPassword = process.env.STUDIO_PASSWORD;
-  if (!configuredUsername || !configuredPassword)
+  if (!process.env.STUDIO_PASSWORD || !process.env.GEMINI_MASTER_KEY)
     return NextResponse.redirect(new URL("/login?error=config", request.url), 303);
 
   const form = await request.formData();
-  const username = String(form.get("username") || "");
+  const email = String(form.get("email") || "");
   const password = String(form.get("password") || "");
   const requestedNext = String(form.get("next") || "/");
 
-  if (username !== configuredUsername || password !== configuredPassword) {
+  if (!(await verifyStudioCredentials(email, password))) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("error", "credentials");
     if (requestedNext.startsWith("/")) loginUrl.searchParams.set("next", requestedNext);
@@ -36,14 +24,14 @@ export async function POST(request: NextRequest) {
       : "/";
   const response = NextResponse.redirect(new URL(safeNext, request.url), 303);
   response.cookies.set(
-    SESSION_COOKIE,
-    await createSessionToken(configuredUsername, configuredPassword),
+    COOKIE_NAME,
+    await createSession(STUDIO_EMAIL),
     {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: SESSION_SECONDS,
     },
   );
   return response;

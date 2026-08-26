@@ -33,6 +33,13 @@ export async function getDb() {
       id TEXT PRIMARY KEY,
       value BIGINT NOT NULL DEFAULT 1000
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS studio_users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      updated_at BIGINT NOT NULL
+    )`;
   })();
   await schemaReady;
   return sql;

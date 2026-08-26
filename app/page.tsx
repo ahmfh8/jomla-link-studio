@@ -37,6 +37,12 @@ export default function Home() {
     "unknown" | "saving" | "ready" | "error"
   >("unknown");
   const [apiMessage, setApiMessage] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
   const [prompts, setPrompts] = useState<PromptTemplate[]>([]);
   const [promptId, setPromptId] = useState("");
   const [promptOpen, setPromptOpen] = useState(false);
@@ -205,6 +211,36 @@ export default function Home() {
       setApiMessage(
         error instanceof Error ? error.message : "تعذر اختبار المفتاح",
       );
+    }
+  }
+  async function savePassword() {
+    setPasswordMessage("");
+    setPasswordError(false);
+    if (newPassword !== confirmPassword) {
+      setPasswordError(true);
+      setPasswordMessage("تأكيد كلمة المرور غير مطابق");
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      const response = await fetch("/api/settings/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "تعذر تغيير كلمة المرور");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage("تم تغيير كلمة المرور وحفظها بأمان");
+    } catch (error) {
+      setPasswordError(true);
+      setPasswordMessage(
+        error instanceof Error ? error.message : "تعذر تغيير كلمة المرور",
+      );
+    } finally {
+      setPasswordBusy(false);
     }
   }
   async function selectedLogoFile() {
@@ -802,7 +838,8 @@ export default function Home() {
               ×
             </button>
             <div className="settings-icon">✦</div>
-            <h2>ربط Gemini API</h2>
+            <h2>إعدادات المنصة</h2>
+            <h3>ربط Gemini API</h3>
             <p>
               أدخل المفتاح هنا مرة واحدة. سيختبره الخادم ثم يحفظه مشفرًا، ولن
               يظهر مجددًا في الواجهة.
@@ -840,6 +877,54 @@ export default function Home() {
               المفتاح لا يُحفظ في المتصفح ولا يُرسل إلا إلى خادم النظام الخاص
               بك.
             </small>
+            <div className="settings-divider" />
+            <h3>الحساب وكلمة المرور</h3>
+            <p className="account-email">ahmfh8@gmail.com</p>
+            <label>
+              <span>كلمة المرور الحالية</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>كلمة المرور الجديدة</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="10 أحرف على الأقل"
+              />
+            </label>
+            <label>
+              <span>تأكيد كلمة المرور الجديدة</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </label>
+            {passwordMessage && (
+              <small className={passwordError ? "password-error" : "password-success"}>
+                {passwordMessage}
+              </small>
+            )}
+            <button
+              className="save-password"
+              disabled={
+                passwordBusy ||
+                !currentPassword ||
+                newPassword.length < 10 ||
+                !confirmPassword
+              }
+              onClick={savePassword}
+            >
+              {passwordBusy ? "جاري الحفظ..." : "تغيير كلمة المرور"}
+            </button>
           </section>
         </div>
       )}
