@@ -506,6 +506,12 @@ nav i {
   gap: 5px;
   align-items: center;
 }
+.status > span {
+  overflow-wrap: anywhere;
+}
+.status.error {
+  color: #b42318;
+}
 .status i {
   width: 7px;
   height: 7px;
