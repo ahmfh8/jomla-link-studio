@@ -1,0 +1,3 @@
+{
+  "name":"جملة لينك | استوديو الكتالوج الذكي","short_name":"جملة لينك","description":"إنشاء صور الكتالوج واستخراج بيانات المنتجات إلى Excel","start_url":"/","display":"standalone","background_color":"#F7F9FB","theme_color":"#0A2540","lang":"ar","dir":"rtl","icons":[{"src":"/jomlalink-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

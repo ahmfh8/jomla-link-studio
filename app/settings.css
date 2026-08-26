@@ -1,0 +1,147 @@
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: #0a2540cc;
+  backdrop-filter: blur(8px);
+}
+.settings-modal {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 28px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 26px 80px #0006;
+}
+.settings-close {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  border: 0 !important;
+  background: #eef1f5 !important;
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  font-size: 19px !important;
+}
+.settings-icon {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 13px;
+  background: #eef1f5;
+  color: var(--p);
+  font-size: 19px;
+}
+.settings-modal h2 {
+  font-size: 19px;
+  margin: 15px 0 7px;
+}
+.settings-modal > p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+.settings-modal label {
+  display: grid;
+  gap: 7px;
+}
+.settings-modal label span {
+  font-size: 8px;
+  font-weight: bold;
+  color: #7a8798;
+}
+.settings-modal input {
+  width: 100%;
+  direction: ltr;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  outline: none;
+}
+.settings-modal input:focus {
+  border-color: #00806d;
+  box-shadow: 0 0 0 3px #00c9a71c;
+}
+.connection-state {
+  margin-top: 12px;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #eef1f5;
+  color: #7a8798;
+  font-size: 9px;
+}
+.connection-state.ready {
+  background: #eaf7ee;
+  color: #2c7044;
+}
+.connection-state.error {
+  background: #fff0f0;
+  color: #a43434;
+}
+.connection-state.saving {
+  background: #eef1f5;
+  color: var(--p);
+}
+.success-note {
+  display: block;
+  margin-top: 8px;
+  color: #37764c;
+  font-size: 8px;
+}
+.save-key {
+  width: 100%;
+  margin-top: 15px;
+  border: 0 !important;
+  background: linear-gradient(135deg, var(--p), var(--p2)) !important;
+  color: #fff !important;
+  font-weight: bold;
+  padding: 12px !important;
+}
+.save-key:disabled {
+  opacity: 0.5;
+}
+.security-note {
+  display: block;
+  text-align: center;
+  color: #7a8798;
+  font-size: 8px;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+.prompt-modal {
+  width: min(720px, 100%);
+}
+.prompt-modal label + label {
+  margin-top: 12px;
+}
+.prompt-modal textarea {
+  width: 100%;
+  min-height: 260px;
+  direction: ltr;
+  text-align: left;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  outline: none;
+  line-height: 1.6;
+  font:
+    12px Consolas,
+    monospace;
+}
+.prompt-modal textarea:focus {
+  border-color: #00806d;
+  box-shadow: 0 0 0 3px #00c9a71c;
+}
+.prompt-error {
+  display: block;
+  margin-top: 9px;
+  color: #a43434;
+  font-size: 9px;
+}
