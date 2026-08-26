@@ -52,13 +52,19 @@ export default function Home() {
   const [promptBusy, setPromptBusy] = useState(false);
   const [promptError, setPromptError] = useState("");
   const [zipBusy, setZipBusy] = useState(false);
+  const [generationBusy, setGenerationBusy] = useState(false);
   const [activeNav, setActiveNav] = useState<
     "workspace" | "prompts" | "files" | "results"
   >("workspace");
   const ready = useMemo(
     () =>
-      rows.filter((r) => r.itemNo && r.price && r.pcs && r.status !== "done")
-        .length,
+      rows.filter(
+        (r) =>
+          r.itemNo &&
+          r.price &&
+          r.pcs &&
+          (r.status === "ready" || r.status === "error"),
+      ).length,
     [rows],
   );
   const completed = useMemo(
@@ -352,21 +358,30 @@ export default function Home() {
     }
   }
   async function generateImages() {
-    const rawLogo = await selectedLogoFile();
-    const logo = rawLogo
-      ? await optimizeForUpload(rawLogo, 512, 100_000)
-      : null;
-    for (const row of rows) {
-      if (!row.itemNo || !row.price || !row.pcs || row.status === "done")
-        continue;
-      setRows((v) =>
-        v.map((x) =>
-          x.id === row.id
-            ? { ...x, status: "processing", error: undefined }
-            : x,
-        ),
-      );
-      try {
+    if (generationBusy) return;
+    const queue = rows.filter(
+      (row) =>
+        row.itemNo &&
+        row.price &&
+        row.pcs &&
+        (row.status === "ready" || row.status === "error"),
+    );
+    if (!queue.length) return;
+    setGenerationBusy(true);
+    setRows((current) =>
+      current.map((row) =>
+        queue.some((queued) => queued.id === row.id)
+          ? { ...row, status: "processing", error: undefined }
+          : row,
+      ),
+    );
+    try {
+      const rawLogo = await selectedLogoFile();
+      const logo = rawLogo
+        ? await optimizeForUpload(rawLogo, 512, 100_000)
+        : null;
+      for (const row of queue) {
+        try {
         const image = await optimizeForUpload(row.file, 1200, 520_000);
         const form = new FormData();
         form.append("image", image);
@@ -398,20 +413,41 @@ export default function Home() {
             x.id === row.id ? { ...x, status: "done", output } : x,
           ),
         );
-      } catch (error) {
-        setRows((v) =>
-          v.map((x) =>
-            x.id === row.id
-              ? {
-                  ...x,
-                  status: "error",
-                  error:
-                    error instanceof Error ? error.message : "فشل إنشاء الصورة",
-                }
-              : x,
-          ),
-        );
+        } catch (error) {
+          setRows((v) =>
+            v.map((x) =>
+              x.id === row.id
+                ? {
+                    ...x,
+                    status: "error",
+                    error:
+                      error instanceof Error
+                        ? error.message
+                        : "فشل إنشاء الصورة",
+                  }
+                : x,
+            ),
+          );
+        }
       }
+    } catch (error) {
+      setRows((current) =>
+        current.map((row) =>
+          queue.some((queued) => queued.id === row.id) &&
+          row.status === "processing"
+            ? {
+                ...row,
+                status: "error",
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "تعذر تجهيز الصور للإنشاء",
+              }
+            : row,
+        ),
+      );
+    } finally {
+      setGenerationBusy(false);
     }
   }
   return (
@@ -810,12 +846,15 @@ export default function Home() {
                   : `تنزيل ZIP${completed ? ` (${completed})` : ""}`}
               </button>
               <button
+                type="button"
                 className="primary"
                 onClick={mode === "design" ? generateImages : undefined}
-                disabled={mode === "design" ? !ready : true}
+                disabled={mode === "design" ? !ready || generationBusy : true}
               >
                 {mode === "design"
-                  ? `✦ بدء إنشاء ${ready || ""} صورة`
+                  ? generationBusy
+                    ? "جاري إنشاء الصور..."
+                    : `✦ بدء إنشاء ${ready || ""} صورة`
                   : "✦ بدء التحليل والتعبئة"}
               </button>
             </div>
@@ -1126,18 +1165,18 @@ async function optimizeForUpload(
   maxDimension: number,
   maxBytes: number,
 ) {
-  const bitmap = await createImageBitmap(file);
-  let scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  const image = await loadImageSource(file);
+  let scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
   let best: Blob | null = null;
   for (let pass = 0; pass < 4; pass++) {
     const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
     const context = canvas.getContext("2d");
     if (!context) throw new Error("تعذر تجهيز الصورة للإرسال");
     context.fillStyle = "#fff";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    context.drawImage(image.source, 0, 0, canvas.width, canvas.height);
     for (const quality of [0.86, 0.76, 0.66, 0.56]) {
       const blob = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", quality),
@@ -1145,7 +1184,7 @@ async function optimizeForUpload(
       if (blob) {
         best = blob;
         if (blob.size <= maxBytes) {
-          bitmap.close();
+          image.close();
           return new File([blob], `${file.name.replace(/\.[^.]+$/g, "")}.jpg`, {
             type: "image/jpeg",
           });
@@ -1154,11 +1193,49 @@ async function optimizeForUpload(
     }
     scale *= 0.82;
   }
-  bitmap.close();
+  image.close();
   if (!best) throw new Error("تعذر ضغط الصورة للإرسال");
   return new File([best], `${file.name.replace(/\.[^.]+$/g, "")}.jpg`, {
     type: "image/jpeg",
   });
+}
+async function loadImageSource(file: File): Promise<{
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  close: () => void;
+}> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        close: () => bitmap.close(),
+      };
+    } catch {
+      // Safari can reject some valid camera images; fall back to an img URL.
+    }
+  }
+  const url = URL.createObjectURL(file);
+  const element = new Image();
+  element.decoding = "async";
+  element.src = url;
+  try {
+    await element.decode();
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      element.onload = () => resolve();
+      element.onerror = () => reject(new Error("صيغة الصورة غير مدعومة"));
+    });
+  }
+  return {
+    source: element,
+    width: element.naturalWidth,
+    height: element.naturalHeight,
+    close: () => URL.revokeObjectURL(url),
+  };
 }
 function ExtractMode() {
   const [template, setTemplate] = useState("");
