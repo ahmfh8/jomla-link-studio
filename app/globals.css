@@ -589,8 +589,12 @@ nav i {
     grid-column: 1/-1;
     grid-template-columns: 1fr 1fr;
   }
-  .status {
-    display: none;
+  .row .status {
+    display: inline-flex;
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 4px;
+    font-size: 9px;
   }
   .work > footer {
     right: 0;
