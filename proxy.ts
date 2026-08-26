@@ -6,6 +6,8 @@ export async function proxy(request: NextRequest) {
     return new NextResponse("Studio access is not configured", { status: 503 });
 
   const { pathname, search } = request.nextUrl;
+  // Only the brand asset used by the public login page bypasses authentication.
+  if (pathname === "/jomlalink-symbol.svg") return NextResponse.next();
   if (pathname === "/login" || pathname.startsWith("/api/auth/"))
     return NextResponse.next();
 
