@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { getDb } from "../db";
 
 const encoder = new TextEncoder();
@@ -79,7 +79,6 @@ export async function generateCatalogImage(input: {
   prompt: string;
 }) {
   const apiKey = await getGeminiApiKey();
-  const ai = new GoogleGenAI({ apiKey });
   const parts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
   > = [
@@ -93,20 +92,49 @@ export async function generateCatalogImage(input: {
         data: input.logoData,
       },
     });
-  const response = await ai.models.generateContent({
-    model: "gemini-3.1-flash-image",
-    contents: [{ role: "user", parts }],
-    config: {
-      responseModalities: [Modality.IMAGE],
-      imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseModalities: ["IMAGE"],
+          responseFormat: {
+            image: { aspectRatio: "1:1", imageSize: "1K" },
+          },
+        },
+      }),
     },
-  });
-  const outputParts = response.candidates?.[0]?.content?.parts || [];
+  );
+  const payload = (await response.json().catch(() => null)) as {
+    error?: { message?: string };
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{
+          text?: string;
+          inlineData?: { mimeType?: string; data?: string };
+        }>;
+      };
+    }>;
+  } | null;
+  if (!response.ok)
+    throw new Error(
+      payload?.error?.message || `Gemini image request failed (${response.status})`,
+    );
+  const outputParts = payload?.candidates?.[0]?.content?.parts || [];
   const image = outputParts.find((part) =>
     Boolean(part.inlineData?.data),
   )?.inlineData;
   if (!image?.data)
-    throw new Error(response.text || "Gemini did not return an image");
+    throw new Error(
+      outputParts.find((part) => part.text)?.text ||
+        "Gemini did not return an image",
+    );
   return {
     data: base64ToBytes(image.data),
     mimeType: image.mimeType || "image/png",
