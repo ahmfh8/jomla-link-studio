@@ -185,7 +185,7 @@
   font-weight: bold;
 }
 .company-add {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 110px auto;
   align-items: end;
 }
 .company-add button {
