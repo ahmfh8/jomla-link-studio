@@ -27,7 +27,11 @@ export default function SmartExtractMode() {
   const [companyName, setCompanyName] = useState("");
   const [companyStartNumber, setCompanyStartNumber] = useState("1001");
   const [companyBusy, setCompanyBusy] = useState(false);
+  const [companyActionBusy, setCompanyActionBusy] = useState(false);
   const [companyError, setCompanyError] = useState("");
+  const [companyEditing, setCompanyEditing] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editNextNumber, setEditNextNumber] = useState("");
   const completed = useMemo(
     () => jobs.filter((job) => job.status === "done").length,
     [jobs],
@@ -94,6 +98,83 @@ export default function SmartExtractMode() {
       );
     } finally {
       setCompanyBusy(false);
+    }
+  }
+
+  function openCompanyEdit() {
+    if (!selectedCompany) return;
+    setEditCompanyName(selectedCompany.name);
+    setEditNextNumber(String(selectedCompany.nextNumber));
+    setCompanyError("");
+    setCompanyEditing(true);
+  }
+
+  async function saveCompanyEdit() {
+    if (!selectedCompany || companyActionBusy) return;
+    setCompanyActionBusy(true);
+    setCompanyError("");
+    try {
+      const response = await fetch("/api/companies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedCompany.id,
+          name: editCompanyName.trim(),
+          nextNumber: Number(editNextNumber),
+        }),
+      });
+      const data = (await response.json()) as {
+        company?: Company;
+        error?: string;
+      };
+      if (!response.ok || !data.company)
+        throw new Error(data.error || "تعذر تعديل الشركة");
+      setCompanies((current) =>
+        current.map((company) =>
+          company.id === data.company!.id ? data.company! : company,
+        ),
+      );
+      setCompanyEditing(false);
+      setResultUrls(null);
+    } catch (error) {
+      setCompanyError(
+        error instanceof Error ? error.message : "تعذر تعديل الشركة",
+      );
+    } finally {
+      setCompanyActionBusy(false);
+    }
+  }
+
+  async function archiveCompany() {
+    if (!selectedCompany || companyActionBusy) return;
+    if (
+      !window.confirm(
+        `إزالة شركة «${selectedCompany.name}» من القائمة؟ سيبقى سجل أرقامها محفوظًا لمنع التكرار.`,
+      )
+    )
+      return;
+    setCompanyActionBusy(true);
+    setCompanyError("");
+    try {
+      const response = await fetch("/api/companies", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedCompany.id }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "تعذر حذف الشركة");
+      const remaining = companies.filter(
+        (company) => company.id !== selectedCompany.id,
+      );
+      setCompanies(remaining);
+      chooseCompany(remaining[0]?.id || "");
+      setCompanyEditing(false);
+    } catch (error) {
+      setCompanyError(
+        error instanceof Error ? error.message : "تعذر حذف الشركة",
+      );
+    } finally {
+      setCompanyActionBusy(false);
     }
   }
 
@@ -274,6 +355,21 @@ export default function SmartExtractMode() {
                 ? `الرقم الظاهر التالي: ${selectedCompany.nextNumber}`
                 : "أضف شركة ليبدأ تسلسلها من 1001"}
             </small>
+            {selectedCompany && (
+              <div className="company-manage-actions">
+                <button type="button" onClick={openCompanyEdit}>
+                  تعديل الشركة والرقم
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => void archiveCompany()}
+                  disabled={companyActionBusy}
+                >
+                  حذف الشركة
+                </button>
+              </div>
+            )}
           </div>
           <div className="company-add">
             <label>
@@ -314,6 +410,44 @@ export default function SmartExtractMode() {
             </button>
           </div>
         </div>
+        {companyEditing && selectedCompany && (
+          <div className="company-edit-box">
+            <strong>تعديل {selectedCompany.name}</strong>
+            <label>
+              <span>اسم الشركة</span>
+              <input
+                value={editCompanyName}
+                onChange={(event) => setEditCompanyName(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>الرقم التالي</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={editNextNumber}
+                onChange={(event) => setEditNextNumber(event.target.value)}
+              />
+            </label>
+            <div>
+              <button
+                type="button"
+                onClick={() => void saveCompanyEdit()}
+                disabled={
+                  companyActionBusy ||
+                  editCompanyName.trim().length < 2 ||
+                  Number(editNextNumber) < 1
+                }
+              >
+                {companyActionBusy ? "جاري الحفظ..." : "حفظ التعديل"}
+              </button>
+              <button type="button" onClick={() => setCompanyEditing(false)}>
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )}
         {companyError && <p className="inline-error">{companyError}</p>}
         <div className="price-mode">
           <div>
