@@ -168,6 +168,7 @@ export async function extractCatalogData(input: {
   imageData: string;
   imageMime: string;
   priceMode: "piece" | "dozen";
+  companyId: string;
 }) {
   const apiKey = await getGeminiApiKey();
   const ai = new GoogleGenAI({ apiKey });
@@ -243,7 +244,7 @@ Rules:
   const item = Object.fromEntries(
     keys.map((key) => [key, String(parsed[key] ?? "").trim()]),
   ) as ExtractedCatalogItem;
-  item.item_code = await nextInternalItemCode();
+  item.item_code = await nextCompanyItemCode(input.companyId);
   const visiblePrice = parseNumericPrice(item.price);
   if (visiblePrice !== null) {
     const unitPrice =
@@ -264,13 +265,25 @@ Rules:
   return item;
 }
 
-async function nextInternalItemCode() {
+async function nextCompanyItemCode(companyId: string) {
   const sql = await getDb();
-  const rows = await sql`INSERT INTO counters (id, value) VALUES ('visible_item_code', 1001)
-    ON CONFLICT(id) DO UPDATE SET value = counters.value + 1 RETURNING value` as Array<{ value: number }>;
+  const company = (await sql`SELECT id FROM catalog_companies WHERE id=${companyId} LIMIT 1`) as Array<{ id: string }>;
+  if (!company[0]) throw new Error("الشركة المحددة غير موجودة");
+  const internalId = crypto.randomUUID();
+  const now = Date.now();
+  const rows = (await sql`WITH next_number AS (
+      INSERT INTO company_item_counters (company_id, value)
+      VALUES (${companyId}, 1001)
+      ON CONFLICT(company_id) DO UPDATE
+      SET value = company_item_counters.value + 1
+      RETURNING value
+    )
+    INSERT INTO issued_item_numbers (id, company_id, visible_number, created_at)
+    SELECT ${internalId}, ${companyId}, value, ${now} FROM next_number
+    RETURNING visible_number AS value`) as Array<{ value: number }>;
   const row = rows[0];
   if (!row?.value) throw new Error("Could not create internal item code");
-  return `RS-${row.value}`;
+  return String(row.value);
 }
 
 function parseNumericPrice(value: string) {
