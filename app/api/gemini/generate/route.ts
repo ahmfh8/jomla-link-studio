@@ -38,12 +38,17 @@ export async function POST(request: Request) {
     const pcs = requiredText(form, "pcs");
     const notes = String(form.get("notes") || "").trim();
     const template = String(form.get("promptTemplate") || "").trim();
+    const generationModel =
+      String(form.get("generationModel") || "economy") === "quality"
+        ? "quality"
+        : "economy";
     const result = await generateCatalogImage({
       imageData: fileToBase64(await source.arrayBuffer()),
       imageMime: source.type,
       logoData: logo ? fileToBase64(await logo.arrayBuffer()) : undefined,
       logoMime: logo?.type,
       prompt: buildCatalogPrompt({ itemNo, price, pcs, notes, template }),
+      model: generationModel,
     });
     const filename = `${cleanName(itemNo)}.png`;
     return new Response(result.data, {
