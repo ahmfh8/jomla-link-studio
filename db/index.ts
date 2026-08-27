@@ -33,6 +33,25 @@ export async function getDb() {
       id TEXT PRIMARY KEY,
       value BIGINT NOT NULL DEFAULT 1000
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS catalog_companies (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    )`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS catalog_companies_name_unique
+      ON catalog_companies (LOWER(name))`;
+    await sql`CREATE TABLE IF NOT EXISTS company_item_counters (
+      company_id TEXT PRIMARY KEY REFERENCES catalog_companies(id) ON DELETE CASCADE,
+      value BIGINT NOT NULL DEFAULT 1000
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS issued_item_numbers (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES catalog_companies(id) ON DELETE CASCADE,
+      visible_number BIGINT NOT NULL,
+      created_at BIGINT NOT NULL,
+      UNIQUE(company_id, visible_number)
+    )`;
     await sql`CREATE TABLE IF NOT EXISTS studio_users (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
