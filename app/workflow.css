@@ -144,6 +144,63 @@
   border-radius: 12px;
   background: #f7f9fb;
 }
+.company-picker {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.25fr);
+  gap: 12px;
+  margin-top: 17px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f7f9fb;
+}
+.company-current,
+.company-add {
+  display: grid;
+  gap: 7px;
+}
+.company-current label,
+.company-add label {
+  display: grid;
+  gap: 5px;
+}
+.company-current label span,
+.company-add label span {
+  font-size: 9px;
+  font-weight: bold;
+}
+.company-current select,
+.company-add input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+}
+.company-current small {
+  color: #00806d;
+  font-size: 8px;
+  font-weight: bold;
+}
+.company-add {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+.company-add button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 13px;
+  background: #0a2540;
+  color: #fff;
+  font-size: 9px;
+  font-weight: bold;
+}
+.company-add button:disabled {
+  opacity: .5;
+}
 .price-mode > div {
   display: flex;
   flex-direction: column;
@@ -177,6 +234,10 @@
   box-shadow: 0 0 0 2px #00806d12;
 }
 @media (max-width: 700px) {
+  .company-picker,
+  .company-add {
+    grid-template-columns: 1fr;
+  }
   .price-mode {
     grid-template-columns: 1fr 1fr;
   }
