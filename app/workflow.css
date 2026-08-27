@@ -184,6 +184,71 @@
   font-size: 8px;
   font-weight: bold;
 }
+.company-manage-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.company-manage-actions button {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: #fff;
+  color: #0a2540;
+  font-size: 8px;
+  font-weight: bold;
+}
+.company-manage-actions button.danger {
+  color: #a43434;
+  border-color: #e8c2c2;
+}
+.company-edit-box {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) 130px auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid #00a98f55;
+  border-radius: 12px;
+  background: #f1fbf8;
+}
+.company-edit-box > strong {
+  align-self: center;
+  font-size: 9px;
+}
+.company-edit-box label {
+  display: grid;
+  gap: 5px;
+}
+.company-edit-box label span {
+  font-size: 8px;
+  font-weight: bold;
+}
+.company-edit-box input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #fff;
+}
+.company-edit-box > div {
+  display: flex;
+  gap: 7px;
+}
+.company-edit-box button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 8px;
+  font-weight: bold;
+}
+.company-edit-box button:first-child {
+  background: #00806d;
+  color: #fff;
+}
 .company-add {
   grid-template-columns: 1fr 110px auto;
   align-items: end;
@@ -235,7 +300,8 @@
 }
 @media (max-width: 700px) {
   .company-picker,
-  .company-add {
+  .company-add,
+  .company-edit-box {
     grid-template-columns: 1fr;
   }
   .price-mode {
