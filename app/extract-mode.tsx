@@ -25,6 +25,7 @@ export default function SmartExtractMode() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [companyStartNumber, setCompanyStartNumber] = useState("1001");
   const [companyBusy, setCompanyBusy] = useState(false);
   const [companyError, setCompanyError] = useState("");
   const completed = useMemo(
@@ -71,7 +72,7 @@ export default function SmartExtractMode() {
       const response = await fetch("/api/companies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, startNumber: Number(companyStartNumber) }),
       });
       const data = (await response.json()) as {
         company?: Company;
@@ -86,6 +87,7 @@ export default function SmartExtractMode() {
       );
       chooseCompany(data.company.id);
       setCompanyName("");
+      setCompanyStartNumber("1001");
     } catch (error) {
       setCompanyError(
         error instanceof Error ? error.message : "تعذر إضافة الشركة",
@@ -288,10 +290,25 @@ export default function SmartExtractMode() {
                 placeholder="مثال: كنوز التحدي"
               />
             </label>
+            <label>
+              <span>الرقم التالي</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={companyStartNumber}
+                onChange={(event) => setCompanyStartNumber(event.target.value)}
+                title="للشركة الجديدة اتركه 1001، ولشركة سابقة اكتب الرقم التالي بعد آخر رقم مستخدم"
+              />
+            </label>
             <button
               type="button"
               onClick={() => void addCompany()}
-              disabled={companyBusy || companyName.trim().length < 2}
+              disabled={
+                companyBusy ||
+                companyName.trim().length < 2 ||
+                Number(companyStartNumber) < 1
+              }
             >
               {companyBusy ? "جاري الإضافة..." : "＋ إضافة الشركة"}
             </button>
