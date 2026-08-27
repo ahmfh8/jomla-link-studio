@@ -27,12 +27,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as { name?: string };
+    const payload = (await request.json()) as {
+      name?: string;
+      startNumber?: number | string;
+    };
     const name = String(payload.name || "").trim();
+    const startNumber = Number(payload.startNumber || 1001);
     if (name.length < 2)
       return Response.json({ error: "اكتب اسم الشركة" }, { status: 400 });
     if (name.length > 80)
       return Response.json({ error: "اسم الشركة طويل جدًا" }, { status: 400 });
+    if (!Number.isInteger(startNumber) || startNumber < 1 || startNumber > 999999999)
+      return Response.json({ error: "الرقم التالي غير صالح" }, { status: 400 });
     const sql = await getDb();
     const existing = (await sql`SELECT
       company.id,
@@ -47,7 +53,9 @@ export async function POST(request: Request) {
     const now = Date.now();
     const rows = (await sql`INSERT INTO catalog_companies (id, name, created_at, updated_at)
       VALUES (${id}, ${name}, ${now}, ${now})
-      RETURNING id, name, 1001 AS next_number`) as CompanyRow[];
+      RETURNING id, name, ${startNumber} AS next_number`) as CompanyRow[];
+    await sql`INSERT INTO company_item_counters (company_id, value)
+      VALUES (${id}, ${startNumber - 1})`;
     return Response.json({ company: companyJson(rows[0]) }, { status: 201 });
   } catch (error) {
     return Response.json(
