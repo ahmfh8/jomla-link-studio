@@ -53,6 +53,9 @@ export default function Home() {
   const [promptError, setPromptError] = useState("");
   const [zipBusy, setZipBusy] = useState(false);
   const [generationBusy, setGenerationBusy] = useState(false);
+  const [generationModel, setGenerationModel] = useState<
+    "economy" | "quality"
+  >("economy");
   const [activeNav, setActiveNav] = useState<
     "workspace" | "prompts" | "files" | "results"
   >("workspace");
@@ -134,8 +137,17 @@ export default function Home() {
         localStorage.getItem("jomla-link-logos") ||
         localStorage.getItem("wow-logos");
       if (stored) setLogos([defaultLogo, ...JSON.parse(stored)]);
+      const storedModel = localStorage.getItem("jomla-link-image-model");
+      if (storedModel === "economy" || storedModel === "quality")
+        setGenerationModel(storedModel);
     } catch {}
   }, []);
+  function chooseGenerationModel(model: "economy" | "quality") {
+    setGenerationModel(model);
+    try {
+      localStorage.setItem("jomla-link-image-model", model);
+    } catch {}
+  }
   useEffect(() => {
     fetch("/api/prompts")
       .then((response) => response.json())
@@ -391,6 +403,7 @@ export default function Home() {
         form.append("pcs", row.pcs);
         form.append("notes", row.notes);
         form.append("promptTemplate", selectedPrompt?.content || "");
+        form.append("generationModel", generationModel);
         const response = await fetch("/api/gemini/generate", {
           method: "POST",
           body: form,
@@ -635,6 +648,28 @@ export default function Home() {
                     </button>
                   </div>
                 </div>
+              </div>
+              <div className="price-mode model-mode">
+                <div>
+                  <strong>تكلفة وجودة إنشاء الصور</strong>
+                  <small>اختر الاقتصادي للدفعات، والجودة الأعلى للصور المهمة</small>
+                </div>
+                <button
+                  type="button"
+                  className={generationModel === "economy" ? "selected" : ""}
+                  onClick={() => chooseGenerationModel("economy")}
+                >
+                  <b>اقتصادي — موصى به</b>
+                  <span>Flash Lite · أوفر قرابة 50%</span>
+                </button>
+                <button
+                  type="button"
+                  className={generationModel === "quality" ? "selected" : ""}
+                  onClick={() => chooseGenerationModel("quality")}
+                >
+                  <b>جودة أعلى</b>
+                  <span>Flash Image · للنصوص والتصاميم المعقدة</span>
+                </button>
               </div>
               {excelError && <p className="inline-error">{excelError}</p>}
               {promptError && !promptOpen && (
