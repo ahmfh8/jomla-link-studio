@@ -1,5 +1,5 @@
 "use client";
-import { ChangeEvent, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 
 type ExtractedItem = Record<string, string>;
 type Job = {
@@ -9,6 +9,7 @@ type Job = {
   error?: string;
   item?: ExtractedItem;
 };
+type Company = { id: string; name: string; nextNumber: number };
 
 export default function SmartExtractMode() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -21,10 +22,78 @@ export default function SmartExtractMode() {
     csv: string;
   } | null>(null);
   const [priceMode, setPriceMode] = useState<"piece" | "dozen">("piece");
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyId, setCompanyId] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyBusy, setCompanyBusy] = useState(false);
+  const [companyError, setCompanyError] = useState("");
   const completed = useMemo(
     () => jobs.filter((job) => job.status === "done").length,
     [jobs],
   );
+  const selectedCompany = companies.find((company) => company.id === companyId);
+
+  useEffect(() => {
+    fetch("/api/companies")
+      .then((response) => response.json())
+      .then((data: { companies?: Company[]; error?: string }) => {
+        if (data.error) throw new Error(data.error);
+        const next = data.companies || [];
+        setCompanies(next);
+        const stored = localStorage.getItem("jomla-link-company-id");
+        setCompanyId(
+          next.some((company) => company.id === stored)
+            ? String(stored)
+            : next[0]?.id || "",
+        );
+      })
+      .catch((error) =>
+        setCompanyError(
+          error instanceof Error ? error.message : "تعذر تحميل الشركات",
+        ),
+      );
+  }, []);
+
+  function chooseCompany(id: string) {
+    setCompanyId(id);
+    setResultUrls(null);
+    try {
+      localStorage.setItem("jomla-link-company-id", id);
+    } catch {}
+  }
+
+  async function addCompany() {
+    const name = companyName.trim();
+    if (!name || companyBusy) return;
+    setCompanyBusy(true);
+    setCompanyError("");
+    try {
+      const response = await fetch("/api/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = (await response.json()) as {
+        company?: Company;
+        error?: string;
+      };
+      if (!response.ok || !data.company)
+        throw new Error(data.error || "تعذر إضافة الشركة");
+      setCompanies((current) =>
+        current.some((company) => company.id === data.company!.id)
+          ? current
+          : [...current, data.company!],
+      );
+      chooseCompany(data.company.id);
+      setCompanyName("");
+    } catch (error) {
+      setCompanyError(
+        error instanceof Error ? error.message : "تعذر إضافة الشركة",
+      );
+    } finally {
+      setCompanyBusy(false);
+    }
+  }
 
   function loadImageFiles(incoming: File[]) {
     const files = incoming
@@ -81,7 +150,7 @@ export default function SmartExtractMode() {
     e.target.value = "";
   }
   async function startExtraction() {
-    if (!jobs.length || running) return;
+    if (!jobs.length || !companyId || running) return;
     setRunning(true);
     setResultUrls(null);
     const extracted: ExtractedItem[] = [];
@@ -98,6 +167,7 @@ export default function SmartExtractMode() {
         const form = new FormData();
         form.append("image", image);
         form.append("priceMode", priceMode);
+        form.append("companyId", companyId);
         const response = await fetch("/api/gemini/extract", {
           method: "POST",
           body: form,
@@ -139,6 +209,13 @@ export default function SmartExtractMode() {
         xlsx: URL.createObjectURL(files.xlsx),
         csv: URL.createObjectURL(files.csv),
       });
+      setCompanies((current) =>
+        current.map((company) =>
+          company.id === companyId
+            ? { ...company, nextNumber: company.nextNumber + extracted.length }
+            : company,
+        ),
+      );
     }
     setRunning(false);
   }
@@ -174,6 +251,53 @@ export default function SmartExtractMode() {
           title="إعداد ملف البيانات"
           text="ارفع الصور، ويمكنك إضافة قالب Excel للمحافظة على أعمدته"
         />
+        <div className="company-picker">
+          <div className="company-current">
+            <label>
+              <span>الشركة الحالية</span>
+              <select
+                value={companyId}
+                onChange={(event) => chooseCompany(event.target.value)}
+              >
+                <option value="">اختر شركة</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <small>
+              {selectedCompany
+                ? `الرقم الظاهر التالي: ${selectedCompany.nextNumber}`
+                : "أضف شركة ليبدأ تسلسلها من 1001"}
+            </small>
+          </div>
+          <div className="company-add">
+            <label>
+              <span>إضافة شركة جديدة</span>
+              <input
+                value={companyName}
+                onChange={(event) => setCompanyName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void addCompany();
+                  }
+                }}
+                placeholder="مثال: كنوز التحدي"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void addCompany()}
+              disabled={companyBusy || companyName.trim().length < 2}
+            >
+              {companyBusy ? "جاري الإضافة..." : "＋ إضافة الشركة"}
+            </button>
+          </div>
+        </div>
+        {companyError && <p className="inline-error">{companyError}</p>}
         <div className="price-mode">
           <div>
             <strong>نوع السعر الظاهر في الصور</strong>
@@ -319,7 +443,7 @@ export default function SmartExtractMode() {
         <button
           className="primary"
           onClick={startExtraction}
-          disabled={running || !jobs.length}
+          disabled={running || !jobs.length || !companyId}
         >
           {running
             ? `جاري التحليل ${completed}/${jobs.length}`
@@ -349,6 +473,9 @@ function normalize(value: unknown) {
 }
 const headerMap: Record<string, string> = {
   itemcode: "item_code",
+  الرقمالظاهر: "item_code",
+  الرقمالضاهر: "item_code",
+  الرقمالداخلي: "item_code",
   itemno: "supplier_code",
   رقمالصنف: "supplier_code",
   كودالصنف: "supplier_code",
