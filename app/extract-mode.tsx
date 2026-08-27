@@ -16,7 +16,10 @@ export default function SmartExtractMode() {
   const [templateFields, setTemplateFields] = useState<string[]>([]);
   const [templateError, setTemplateError] = useState("");
   const [running, setRunning] = useState(false);
-  const [resultUrl, setResultUrl] = useState("");
+  const [resultUrls, setResultUrls] = useState<{
+    xlsx: string;
+    csv: string;
+  } | null>(null);
   const [priceMode, setPriceMode] = useState<"piece" | "dozen">("piece");
   const completed = useMemo(
     () => jobs.filter((job) => job.status === "done").length,
@@ -34,7 +37,7 @@ export default function SmartExtractMode() {
         status: "ready",
       })),
     );
-    setResultUrl("");
+    setResultUrls(null);
   }
   function loadImages(e: ChangeEvent<HTMLInputElement>) {
     loadImageFiles(Array.from(e.target.files || []));
@@ -64,7 +67,7 @@ export default function SmartExtractMode() {
       if (!headers.length) throw new Error("قالب Excel فارغ");
       setTemplateFile(file);
       setTemplateFields(headers);
-      setResultUrl("");
+      setResultUrls(null);
     } catch (error) {
       setTemplateFile(null);
       setTemplateFields([]);
@@ -78,9 +81,9 @@ export default function SmartExtractMode() {
     e.target.value = "";
   }
   async function startExtraction() {
-    if (!templateFile || !jobs.length || running) return;
+    if (!jobs.length || running) return;
     setRunning(true);
-    setResultUrl("");
+    setResultUrls(null);
     const extracted: ExtractedItem[] = [];
     for (const job of jobs) {
       setJobs((current) =>
@@ -131,8 +134,11 @@ export default function SmartExtractMode() {
       }
     }
     if (extracted.length) {
-      const blob = await fillTemplate(templateFile, extracted);
-      setResultUrl(URL.createObjectURL(blob));
+      const files = await buildExportFiles(templateFile, extracted);
+      setResultUrls({
+        xlsx: URL.createObjectURL(files.xlsx),
+        csv: URL.createObjectURL(files.csv),
+      });
     }
     setRunning(false);
   }
@@ -148,7 +154,7 @@ export default function SmartExtractMode() {
         </article>
         <article>
           <small>قالب Excel</small>
-          <b className="word">{templateFile ? "جاهز" : "مطلوب"}</b>
+          <b className="word">{templateFile ? "جاهز" : "اختياري"}</b>
         </article>
         <article>
           <small>الحقول المكتشفة</small>
@@ -166,7 +172,7 @@ export default function SmartExtractMode() {
         <Title
           n="1"
           title="إعداد ملف البيانات"
-          text="ارفع الصور المصممة وقالب Excel الذي تريد تعبئته"
+          text="ارفع الصور، ويمكنك إضافة قالب Excel للمحافظة على أعمدته"
         />
         <div className="price-mode">
           <div>
@@ -228,8 +234,8 @@ export default function SmartExtractMode() {
               onChange={loadTemplate}
             />
             <b>▤</b>
-            <h3>{templateFile?.name || "رفع قالب Excel"}</h3>
-            <p>نحافظ على أسماء الأعمدة وترتيبها</p>
+            <h3>{templateFile?.name || "رفع قالب Excel (اختياري)"}</h3>
+            <p>بدون قالب سننشئ Excel وCSV جاهزين تلقائيًا</p>
             <em>{templateFile ? "تغيير القالب" : "اختيار الملف"}</em>
           </label>
         </div>
@@ -251,7 +257,13 @@ export default function SmartExtractMode() {
               </div>
             ))
           ) : (
-            <p className="empty-map">ارفع القالب لإظهار الحقول</p>
+            DEFAULT_HEADERS.map((field) => (
+              <div key={field}>
+                <strong>{field}</strong>
+                <span>←</span>
+                <em>{fieldSource(field)}</em>
+              </div>
+            ))
           )}
         </div>
       </section>
@@ -284,21 +296,30 @@ export default function SmartExtractMode() {
       <section className="retention">
         <b>حفظ مؤقت وآمن</b>
         <span>
-          تُعالج الصور واحدة تلو الأخرى، ثم يُنشأ ملف Excel جديد بأعمدة القالب
-          نفسه.
+          تُعالج الصور واحدة تلو الأخرى، ثم يُنشأ ملف Excel وملف CSV. وإذا
+          أضفت قالبًا فسيُحفظ ترتيب أعمدته.
         </span>
         <i>لا تُحفظ الصور في المتصفح</i>
       </section>
       <div className="extract-actions">
-        {resultUrl && (
-          <a href={resultUrl} download="catalog-filled.xlsx">
-            تنزيل Excel المكتمل
-          </a>
+        {resultUrls && (
+          <>
+            <a href={resultUrls.xlsx} download="jomla-link-products.xlsx">
+              تنزيل Excel (.xlsx)
+            </a>
+            <a
+              className="csv-download"
+              href={resultUrls.csv}
+              download="jomla-link-products.csv"
+            >
+              تنزيل CSV (.csv)
+            </a>
+          </>
         )}
         <button
           className="primary"
           onClick={startExtraction}
-          disabled={running || !templateFile || !jobs.length}
+          disabled={running || !jobs.length}
         >
           {running
             ? `جاري التحليل ${completed}/${jobs.length}`
@@ -359,6 +380,22 @@ const headerMap: Record<string, string> = {
   descriptionen: "description_en",
   descriptionhi: "description_hi",
 };
+const DEFAULT_HEADERS = [
+  "item_code",
+  "name_ar",
+  "name_en",
+  "name_hi",
+  "category",
+  "price",
+  "carton_pack_size",
+  "minimum_quantity",
+  "stock_status",
+  "supplier_name",
+  "supplier_code",
+  "description_ar",
+  "description_en",
+  "description_hi",
+];
 function fieldSource(field: string) {
   const key = headerMap[normalize(field)] || normalize(field);
   if (key === "item_code") return "رقم داخلي متسلسل تلقائي";
@@ -385,12 +422,15 @@ async function optimizeImage(file: File) {
   if (!blob) throw new Error("تعذر ضغط الصورة");
   return new File([blob], "catalog.jpg", { type: "image/jpeg" });
 }
-async function fillTemplate(file: File, items: ExtractedItem[]) {
+async function buildExportFiles(file: File | null, items: ExtractedItem[]) {
   const XLSX = await import("xlsx");
-  const workbook = XLSX.read(await file.arrayBuffer(), {
-    type: "array",
-    cellStyles: true,
-  });
+  const workbook = file
+    ? XLSX.read(await file.arrayBuffer(), { type: "array", cellStyles: true })
+    : XLSX.utils.book_new();
+  if (!file) {
+    const sheet = XLSX.utils.aoa_to_sheet([DEFAULT_HEADERS]);
+    XLSX.utils.book_append_sheet(workbook, sheet, "Products");
+  }
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet || !sheet["!ref"]) throw new Error("قالب Excel غير صالح");
   const table = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
@@ -424,7 +464,13 @@ async function fillTemplate(file: File, items: ExtractedItem[]) {
     bookType: "xlsx",
     cellStyles: true,
   });
-  return new Blob([output], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  const csvText = XLSX.utils.sheet_to_csv(sheet);
+  return {
+    xlsx: new Blob([output], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    csv: new Blob(["\uFEFF", csvText], {
+      type: "text/csv;charset=utf-8",
+    }),
+  };
 }
