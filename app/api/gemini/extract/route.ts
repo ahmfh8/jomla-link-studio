@@ -6,6 +6,9 @@ export async function POST(request: Request) {
     const image = form.get("image");
     const priceMode =
       String(form.get("priceMode") || "piece") === "dozen" ? "dozen" : "piece";
+    const companyId = String(form.get("companyId") || "").trim();
+    if (!companyId)
+      return Response.json({ error: "اختر الشركة أولًا" }, { status: 400 });
     if (!(image instanceof File) || !image.type.startsWith("image/"))
       return Response.json({ error: "صورة المنتج مطلوبة" }, { status: 400 });
     if (image.size > 900_000)
@@ -17,6 +20,7 @@ export async function POST(request: Request) {
       imageData: fileToBase64(await image.arrayBuffer()),
       imageMime: image.type,
       priceMode,
+      companyId,
     });
     return Response.json({ item });
   } catch (error) {
