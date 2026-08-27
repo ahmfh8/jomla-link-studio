@@ -39,6 +39,8 @@ export async function getDb() {
       created_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL
     )`;
+    await sql`ALTER TABLE catalog_companies
+      ADD COLUMN IF NOT EXISTS archived_at BIGINT`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS catalog_companies_name_unique
       ON catalog_companies (LOWER(name))`;
     await sql`CREATE TABLE IF NOT EXISTS company_item_counters (
