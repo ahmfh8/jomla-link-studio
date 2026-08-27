@@ -77,6 +77,7 @@ export async function generateCatalogImage(input: {
   logoData?: string;
   logoMime?: string;
   prompt: string;
+  model?: "economy" | "quality";
 }) {
   const apiKey = await getGeminiApiKey();
   const parts: Array<
@@ -92,8 +93,12 @@ export async function generateCatalogImage(input: {
         data: input.logoData,
       },
     });
+  const model =
+    input.model === "quality"
+      ? "gemini-3.1-flash-image"
+      : "gemini-3.1-flash-lite-image";
   const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-image:generateContent",
+    `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
     {
       method: "POST",
       headers: {
