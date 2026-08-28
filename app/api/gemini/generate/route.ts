@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       model: generationModel,
     });
     const filename = `${cleanName(itemNo)}.png`;
-    return new Response(result.data, {
+    return new Response(Uint8Array.from(result.data).buffer, {
       headers: {
         "Content-Type": result.mimeType,
         "Content-Disposition": `inline; filename="${filename}"`,
@@ -72,3 +72,4 @@ export async function POST(request: Request) {
 }
 
 export const maxDuration = 300;
+export const runtime = "nodejs";
