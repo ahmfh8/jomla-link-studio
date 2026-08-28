@@ -56,6 +56,8 @@ STRICT PRODUCT FIDELITY: Isolate and preserve the EXACT physical product, displa
 
 BRANDING: Remove and ignore every retailer/store name, logo or watermark visible in the source image, including WOW STORE. Keep a clean white area at the top-right for the system-applied official logo. Do not draw, copy, invent or write any store/company logo or name yourself.
 
+LOGO SAFE AREA: Keep the top-right 21% width and 22% height completely empty and pure white. Never place a headline, text, product, arrow, inset, border detail or generated logo inside this reserved area.
+
 FOOTER: Create exactly 3 clean gradient capsules with deep-purple circular icon heads. Use English field labels. All descriptive marketing copy above the footer should be Arabic. Output only one finished square catalog image.`;
   const template = (data.template?.trim() || defaultTemplate)
     .replaceAll("[ITEM_NO]", data.itemNo)

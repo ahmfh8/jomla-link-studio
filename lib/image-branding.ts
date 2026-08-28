@@ -45,9 +45,9 @@ export async function applyOfficialLogo(
   if (!width || !height) throw new Error("Generated image dimensions are invalid");
 
   const shortSide = Math.min(width, height);
-  const clearWidth = Math.round(shortSide * 0.24);
+  const clearWidth = Math.round(shortSide * 0.205);
   const clearHeight = Math.round(shortSide * 0.22);
-  const clearRight = Math.round(shortSide * 0.045);
+  const clearRight = Math.round(shortSide * 0.035);
   const clearTop = Math.round(shortSide * 0.032);
   const logoWidth = Math.round(shortSide * 0.17);
   const logoHeight = Math.round(shortSide * 0.12);
