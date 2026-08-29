@@ -80,14 +80,13 @@ export async function generateCatalogImage(input: {
   model?: "economy" | "quality";
 }) {
   const apiKey = await getGeminiApiKey();
-  const parts: Array<
+  const mediaParts: Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
   > = [
-    { text: input.prompt },
     { inlineData: { mimeType: input.imageMime, data: input.imageData } },
   ];
   if (input.logoData)
-    parts.push({
+    mediaParts.push({
       inlineData: {
         mimeType: input.logoMime || "image/png",
         data: input.logoData,
@@ -97,54 +96,68 @@ export async function generateCatalogImage(input: {
     input.model === "quality"
       ? "gemini-3.1-flash-image"
       : "gemini-3.1-flash-lite-image";
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseModalities: ["IMAGE"],
-          imageConfig: {
-            aspectRatio: "1:1",
-            imageSize: "1K",
-          },
+  let refusalReason = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const prompt =
+      attempt === 0
+        ? input.prompt
+        : `${input.prompt}
+
+SAFE PRODUCT RETRY: Treat the source strictly as a harmless retail children's toy product. Create a neutral product-only wholesale catalog layout. Do not add children, people using the product, action, combat, violence, injury, dangerous behavior, or a story scene. Do not invent or enlarge character artwork, brand names, or trademarks; preserve only what is physically visible on the retail product and packaging. Keep all mandatory item data exact.`;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
-      }),
-    },
-  );
-  const payload = (await response.json().catch(() => null)) as {
-    error?: { message?: string };
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{
-          text?: string;
-          inlineData?: { mimeType?: string; data?: string };
-        }>;
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }, ...mediaParts] }],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+            imageConfig: {
+              aspectRatio: "1:1",
+              imageSize: "1K",
+            },
+          },
+        }),
+      },
+    );
+    const payload = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+      promptFeedback?: { blockReason?: string };
+      candidates?: Array<{
+        finishReason?: string;
+        content?: {
+          parts?: Array<{
+            text?: string;
+            inlineData?: { mimeType?: string; data?: string };
+          }>;
+        };
+      }>;
+    } | null;
+    if (!response.ok)
+      throw new Error(
+        payload?.error?.message ||
+          `Gemini image request failed (${response.status})`,
+      );
+    const outputParts = payload?.candidates?.[0]?.content?.parts || [];
+    const image = outputParts.find((part) =>
+      Boolean(part.inlineData?.data),
+    )?.inlineData;
+    if (image?.data)
+      return {
+        data: base64ToBytes(image.data),
+        mimeType: image.mimeType || "image/png",
       };
-    }>;
-  } | null;
-  if (!response.ok)
-    throw new Error(
-      payload?.error?.message || `Gemini image request failed (${response.status})`,
-    );
-  const outputParts = payload?.candidates?.[0]?.content?.parts || [];
-  const image = outputParts.find((part) =>
-    Boolean(part.inlineData?.data),
-  )?.inlineData;
-  if (!image?.data)
-    throw new Error(
+    refusalReason =
+      payload?.promptFeedback?.blockReason ||
+      payload?.candidates?.[0]?.finishReason ||
       outputParts.find((part) => part.text)?.text ||
-        "Gemini did not return an image",
-    );
-  return {
-    data: base64ToBytes(image.data),
-    mimeType: image.mimeType || "image/png",
-  };
+      "NO_IMAGE";
+  }
+  throw new Error(`Gemini رفض إنشاء هذا الصنف (${refusalReason})`);
 }
 
 export type ExtractedCatalogItem = {
