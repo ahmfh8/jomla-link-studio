@@ -25,9 +25,18 @@ export async function POST(request: Request) {
     return Response.json({ item });
   } catch (error) {
     console.error("Gemini extraction failed", error);
+    const message =
+      error instanceof Error ? error.message : "تعذر تحليل الصورة";
+    const transient =
+      /fetch failed|failed to fetch|404|408|425|429|500|502|503|504|overload|temporar|unavailable|rate|quota/i.test(
+        message,
+      );
     return Response.json(
-      { error: error instanceof Error ? error.message : "تعذر تحليل الصورة" },
-      { status: 400 },
+      { error: message },
+      {
+        status: transient ? 503 : 400,
+        headers: transient ? { "Retry-After": "2" } : undefined,
+      },
     );
   }
 }

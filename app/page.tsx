@@ -383,7 +383,7 @@ export default function Home() {
     setRows((current) =>
       current.map((row) =>
         queue.some((queued) => queued.id === row.id)
-          ? { ...row, status: "processing", error: undefined }
+          ? { ...row, status: "ready", error: undefined }
           : row,
       ),
     );
@@ -392,33 +392,32 @@ export default function Home() {
       const logo = rawLogo
         ? await optimizeForUpload(rawLogo, 512, 100_000)
         : null;
-      for (const row of queue) {
+      for (const [rowIndex, row] of queue.entries()) {
         try {
+        setRows((current) =>
+          current.map((item) =>
+            item.id === row.id
+              ? { ...item, status: "processing", error: undefined }
+              : item,
+          ),
+        );
         const image = await optimizeForUpload(row.file, 1200, 520_000);
-        const form = new FormData();
-        form.append("image", image);
-        if (logo) form.append("logo", logo);
-        form.append("itemNo", row.itemNo);
-        form.append("price", row.price);
-        form.append("pcs", row.pcs);
-        form.append("notes", row.notes);
-        form.append("promptTemplate", selectedPrompt?.content || "");
-        form.append("generationModel", generationModel);
-        const response = await fetch("/api/gemini/generate", {
-          method: "POST",
-          body: form,
-        });
-        if (!response.ok) {
-          let message =
-            response.status === 413
-              ? "حجم الصورة أكبر من حد الإرسال"
-              : "فشل إنشاء الصورة";
-          try {
-            const data = (await response.json()) as { error?: string };
-            message = data.error || message;
-          } catch {}
-          throw new Error(`${message} (${response.status})`);
-        }
+        const response = await postFormWithRetry(
+          "/api/gemini/generate",
+          () => {
+            const form = new FormData();
+            form.append("image", image);
+            if (logo) form.append("logo", logo);
+            form.append("itemNo", row.itemNo);
+            form.append("price", row.price);
+            form.append("pcs", row.pcs);
+            form.append("notes", row.notes);
+            form.append("promptTemplate", selectedPrompt?.content || "");
+            form.append("generationModel", generationModel);
+            return form;
+          },
+          "فشل إنشاء الصورة",
+        );
         const blob = await response.blob();
         const output = URL.createObjectURL(blob);
         setRows((v) =>
@@ -442,6 +441,7 @@ export default function Home() {
             ),
           );
         }
+        if (rowIndex < queue.length - 1) await delay(900);
       }
     } catch (error) {
       setRows((current) =>
@@ -1258,14 +1258,20 @@ async function loadImageSource(file: File): Promise<{
   const url = URL.createObjectURL(file);
   const element = new Image();
   element.decoding = "async";
+  const loaded = new Promise<void>((resolve, reject) => {
+    element.onload = () => resolve();
+    element.onerror = () => reject(new Error("صيغة الصورة غير مدعومة"));
+  });
   element.src = url;
   try {
     await element.decode();
   } catch {
-    await new Promise<void>((resolve, reject) => {
-      element.onload = () => resolve();
-      element.onerror = () => reject(new Error("صيغة الصورة غير مدعومة"));
-    });
+    try {
+      await loaded;
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    }
   }
   return {
     source: element,
@@ -1273,6 +1279,48 @@ async function loadImageSource(file: File): Promise<{
     height: element.naturalHeight,
     close: () => URL.revokeObjectURL(url),
   };
+}
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+function retryableResponse(status: number, message: string) {
+  return (
+    [404, 408, 425, 429, 500, 502, 503, 504].includes(status) ||
+    /fetch failed|failed to fetch|network|overload|temporar|unavailable|rate|quota/i.test(
+      message,
+    )
+  );
+}
+async function postFormWithRetry(
+  url: string,
+  makeForm: () => FormData,
+  fallback: string,
+) {
+  let lastError = new Error(fallback);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(url, { method: "POST", body: makeForm() });
+      if (response.ok) return response;
+      let message = response.status === 413 ? "حجم الصورة أكبر من حد الإرسال" : fallback;
+      try {
+        const data = (await response.json()) as { error?: string };
+        message = data.error || message;
+      } catch {}
+      lastError = new Error(`${message} (${response.status})`);
+      if (!retryableResponse(response.status, message)) throw lastError;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(fallback);
+      if (
+        attempt === 2 ||
+        !/fetch|network|load|404|408|425|429|500|502|503|504|overload|temporar|unavailable|rate|quota/i.test(
+          lastError.message,
+        )
+      )
+        throw lastError;
+    }
+    await delay(1400 * (attempt + 1));
+  }
+  throw lastError;
 }
 function ExtractMode() {
   const [template, setTemplate] = useState("");

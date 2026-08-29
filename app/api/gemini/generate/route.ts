@@ -61,12 +61,18 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Gemini generation failed", error);
+    const message =
+      error instanceof Error ? error.message : "Image generation failed";
+    const transient =
+      /fetch failed|failed to fetch|404|408|425|429|500|502|503|504|overload|temporar|unavailable|rate|quota/i.test(
+        message,
+      );
     return Response.json(
+      { error: message },
       {
-        error:
-          error instanceof Error ? error.message : "Image generation failed",
+        status: transient ? 503 : 400,
+        headers: transient ? { "Retry-After": "2" } : undefined,
       },
-      { status: 400 },
     );
   }
 }

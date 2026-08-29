@@ -237,7 +237,7 @@ export default function SmartExtractMode() {
     setRunning(true);
     setResultUrls(null);
     const extracted: ExtractedItem[] = [];
-    for (const job of jobs) {
+    for (const [jobIndex, job] of jobs.entries()) {
       setJobs((current) =>
         current.map((item) =>
           item.id === job.id
@@ -247,20 +247,13 @@ export default function SmartExtractMode() {
       );
       try {
         const image = await optimizeImage(job.file);
-        const form = new FormData();
-        form.append("image", image);
-        form.append("priceMode", priceMode);
-        form.append("companyId", companyId);
-        const response = await fetch("/api/gemini/extract", {
-          method: "POST",
-          body: form,
+        const data = await extractWithRetry(() => {
+          const form = new FormData();
+          form.append("image", image);
+          form.append("priceMode", priceMode);
+          form.append("companyId", companyId);
+          return form;
         });
-        const data = (await response.json()) as {
-          item?: ExtractedItem;
-          error?: string;
-        };
-        if (!response.ok || !data.item)
-          throw new Error(data.error || "تعذر تحليل الصورة");
         extracted.push(data.item);
         setJobs((current) =>
           current.map((item) =>
@@ -285,6 +278,7 @@ export default function SmartExtractMode() {
           ),
         );
       }
+      if (jobIndex < jobs.length - 1) await wait(700);
     }
     if (extracted.length) {
       const files = await buildExportFiles(templateFile, extracted);
@@ -683,22 +677,117 @@ function fieldSource(field: string) {
   return "توليد وتحليل ذكي";
 }
 async function optimizeImage(file: File) {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("تعذر تجهيز الصورة");
-  context.fillStyle = "#fff";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.78),
-  );
-  if (!blob) throw new Error("تعذر ضغط الصورة");
-  return new File([blob], "catalog.jpg", { type: "image/jpeg" });
+  const image = await loadExtractImage(file);
+  let scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+  let best: Blob | null = null;
+  try {
+    for (let pass = 0; pass < 4; pass++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("تعذر تجهيز الصورة");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image.source, 0, 0, canvas.width, canvas.height);
+      for (const quality of [0.8, 0.7, 0.6]) {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", quality),
+        );
+        if (blob) {
+          best = blob;
+          if (blob.size <= 650_000)
+            return new File([blob], "catalog.jpg", { type: "image/jpeg" });
+        }
+      }
+      scale *= 0.8;
+    }
+  } finally {
+    image.close();
+  }
+  if (!best) throw new Error("تعذر ضغط الصورة");
+  return new File([best], "catalog.jpg", { type: "image/jpeg" });
+}
+async function loadExtractImage(file: File): Promise<{
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  close: () => void;
+}> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        close: () => bitmap.close(),
+      };
+    } catch {}
+  }
+  const url = URL.createObjectURL(file);
+  const element = new Image();
+  element.decoding = "async";
+  const loaded = new Promise<void>((resolve, reject) => {
+    element.onload = () => resolve();
+    element.onerror = () => reject(new Error("صيغة الصورة غير مدعومة"));
+  });
+  element.src = url;
+  try {
+    await element.decode();
+  } catch {
+    try {
+      await loaded;
+    } catch (error) {
+      URL.revokeObjectURL(url);
+      throw error;
+    }
+  }
+  return {
+    source: element,
+    width: element.naturalWidth,
+    height: element.naturalHeight,
+    close: () => URL.revokeObjectURL(url),
+  };
+}
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+async function extractWithRetry(
+  makeForm: () => FormData,
+): Promise<{ item: ExtractedItem }> {
+  let lastError = new Error("تعذر تحليل الصورة");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch("/api/gemini/extract", {
+        method: "POST",
+        body: makeForm(),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        item?: ExtractedItem;
+        error?: string;
+      };
+      if (response.ok && data.item) return { item: data.item };
+      const message = data.error || `تعذر تحليل الصورة (${response.status})`;
+      lastError = new Error(message);
+      if (
+        ![404, 408, 425, 429, 500, 502, 503, 504].includes(response.status) &&
+        !/fetch|network|overload|temporar|unavailable|rate|quota/i.test(message)
+      )
+        throw lastError;
+    } catch (error) {
+      lastError = error instanceof Error ? error : lastError;
+      if (
+        attempt === 2 ||
+        !/fetch|network|404|408|425|429|500|502|503|504|overload|temporar|unavailable|rate|quota/i.test(
+          lastError.message,
+        )
+      )
+        throw lastError;
+    }
+    await wait(1200 * (attempt + 1));
+  }
+  throw lastError;
 }
 async function buildExportFiles(file: File | null, items: ExtractedItem[]) {
   const XLSX = await import("xlsx");
