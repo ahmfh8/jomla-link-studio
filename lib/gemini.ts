@@ -68,17 +68,6 @@ MANDATORY EXACT DATA — do not change, translate, omit, or invent any character
 - PCS/CTN: ${data.pcs}
 - OPERATOR NOTES: ${data.notes || "None"}
 
-HIGHEST-PRIORITY DIMENSION RULE — THIS OVERRIDES EVERY EARLIER DIMENSION INSTRUCTION:
-- Read dimensions ONLY from one clearly printed text line located beneath the product image in the FIRST attached image, such as "34.5X5.2X20.0CM".
-- Copy that single bottom dimension string exactly as printed, character for character. Display at most ONE compact Arabic size line: "المقاس: [exact string]".
-- Completely ignore all dimension arrows, diagrams, individual length/width/height labels, numbers printed on the product or packaging, and any measurements located anywhere other than the clear bottom text line.
-- NEVER combine, calculate, convert, round, correct, increase, decrease, or guess any dimension.
-- If even one character or number in the bottom dimension line is unclear, blurred, cut off, or uncertain, OMIT dimensions entirely. Do not display a size badge, measurement line, arrows, or estimated numbers.
-- The SECOND attached image, when present, is the official logo only. Never inspect it for product data or dimensions.
-
-SINGLE-ITEM CONSISTENCY RULE:
-- This request contains exactly one independent product. Apply the same template precision and layout quality regardless of how many other products the operator queued before or after it. Never simplify, crowd, or vary this design because it belongs to a batch.
-
 The first attached image is the source product. If a second image is attached, it is the official logo.`;
 }
 
