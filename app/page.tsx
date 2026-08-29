@@ -369,14 +369,17 @@ export default function Home() {
       setZipBusy(false);
     }
   }
-  async function generateImages() {
+  async function generateImages(targetIds?: string[]) {
     if (generationBusy) return;
+    const requestedIds = targetIds?.length ? new Set(targetIds) : null;
     const queue = rows.filter(
       (row) =>
         row.itemNo &&
         row.price &&
         row.pcs &&
-        (row.status === "ready" || row.status === "error"),
+        (requestedIds
+          ? requestedIds.has(row.id)
+          : row.status === "ready" || row.status === "error"),
     );
     if (!queue.length) return;
     setGenerationBusy(true);
@@ -420,9 +423,14 @@ export default function Home() {
         );
         const blob = await response.blob();
         const output = URL.createObjectURL(blob);
+        if (row.output && row.output !== output) {
+          URL.revokeObjectURL(row.output);
+        }
         setRows((v) =>
           v.map((x) =>
-            x.id === row.id ? { ...x, status: "done", output } : x,
+            x.id === row.id
+              ? { ...x, status: "done", output, error: undefined }
+              : x,
           ),
         );
         } catch (error) {
@@ -431,7 +439,7 @@ export default function Home() {
               x.id === row.id
                 ? {
                     ...x,
-                    status: "error",
+                    status: row.output ? "done" : "error",
                     error:
                       error instanceof Error
                         ? error.message
@@ -821,13 +829,30 @@ export default function Home() {
                         </Field>
                       </div>
                       {r.output ? (
-                        <a
-                          className="download-one"
-                          href={r.output}
-                          download={`${r.itemNo}.png`}
-                        >
-                          تنزيل الصورة
-                        </a>
+                        <div className="generated-actions">
+                          <a
+                            className="download-one"
+                            href={r.output}
+                            download={`${r.itemNo}.png`}
+                          >
+                            تنزيل الصورة
+                          </a>
+                          <button
+                            type="button"
+                            className="redesign-one"
+                            onClick={() => void generateImages([r.id])}
+                            disabled={generationBusy}
+                          >
+                            {r.status === "processing"
+                              ? "جاري إعادة التصميم..."
+                              : "إعادة التصميم"}
+                          </button>
+                          {r.error && (
+                            <small title={r.error}>
+                              فشلت المحاولة — التصميم السابق محفوظ
+                            </small>
+                          )}
+                        </div>
                       ) : (
                         <span className={`status ${r.status}`} title={r.error}>
                           <i />
@@ -885,7 +910,9 @@ export default function Home() {
               <button
                 type="button"
                 className="primary"
-                onClick={mode === "design" ? generateImages : undefined}
+                onClick={
+                  mode === "design" ? () => void generateImages() : undefined
+                }
                 disabled={mode === "design" ? !ready || generationBusy : true}
               >
                 {mode === "design"
