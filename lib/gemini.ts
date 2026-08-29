@@ -1,6 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
 import { getDb } from "../db";
-import { applyOfficialLogo } from "./image-branding";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -54,9 +53,7 @@ AUTOMATIC INTELLIGENCE: Detect the toy type, authentic visible specs, model numb
 
 STRICT PRODUCT FIDELITY: Isolate and preserve the EXACT physical product, display box, colors, accessories and proportions. Do not redesign or invent a different toy. Arrange visible accessories neatly across the lower composition. Use a solid pure white background (#FFFFFF), thin rounded outer border and clean purple accents.
 
-BRANDING: Remove and ignore every retailer/store name, logo or watermark visible in the source image, including WOW STORE. Keep a clean white area at the top-right for the system-applied official logo. Do not draw, copy, invent or write any store/company logo or name yourself.
-
-LOGO SAFE AREA: Keep the top-right 21% width and 22% height completely empty and pure white. Never place a headline, text, product, arrow, inset, border detail or generated logo inside this reserved area.
+LOGO: Place the attached official company logo clearly at the top-right. Do not redraw, rename or alter the logo.
 
 FOOTER: Create exactly 3 clean gradient capsules with deep-purple circular icon heads. Use English field labels. All descriptive marketing copy above the footer should be Arabic. Output only one finished square catalog image.`;
   const template = (data.template?.trim() || defaultTemplate)
@@ -71,7 +68,7 @@ MANDATORY EXACT DATA — do not change, translate, omit, or invent any character
 - PCS/CTN: ${data.pcs}
 - OPERATOR NOTES: ${data.notes || "None"}
 
-The attached image is only the source product. Remove all source-store branding. The official company logo is applied exactly by the system after generation.`;
+The first attached image is the source product. If a second image is attached, it is the official logo.`;
 }
 
 export async function generateCatalogImage(input: {
@@ -89,6 +86,13 @@ export async function generateCatalogImage(input: {
     { text: input.prompt },
     { inlineData: { mimeType: input.imageMime, data: input.imageData } },
   ];
+  if (input.logoData)
+    parts.push({
+      inlineData: {
+        mimeType: input.logoMime || "image/png",
+        data: input.logoData,
+      },
+    });
   const model =
     input.model === "quality"
       ? "gemini-3.1-flash-image"
@@ -137,7 +141,10 @@ export async function generateCatalogImage(input: {
       outputParts.find((part) => part.text)?.text ||
         "Gemini did not return an image",
     );
-  return applyOfficialLogo(base64ToBytes(image.data), input.logoData);
+  return {
+    data: base64ToBytes(image.data),
+    mimeType: image.mimeType || "image/png",
+  };
 }
 
 export type ExtractedCatalogItem = {

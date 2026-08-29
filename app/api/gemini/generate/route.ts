@@ -78,4 +78,3 @@ export async function POST(request: Request) {
 }
 
 export const maxDuration = 300;
-export const runtime = "nodejs";
