@@ -10,12 +10,18 @@ type Row = {
   itemNo: string;
   price: string;
   pcs: string;
+  dimension: string;
   notes: string;
   status: "ready" | "processing" | "done" | "error";
   error?: string;
 };
 type Logo = { id: string; name: string; src: string };
-type PriceItem = { itemNo: string; price: string; pcs: string };
+type PriceItem = {
+  itemNo: string;
+  price: string;
+  pcs: string;
+  dimension: string;
+};
 type PromptTemplate = { id: string; name: string; content: string };
 const defaultLogo: Logo = {
   id: "wow-store",
@@ -102,6 +108,7 @@ export default function Home() {
           itemNo: "",
           price: "",
           pcs: "",
+          dimension: "",
           notes: "",
           status: "ready" as const,
         })),
@@ -125,6 +132,7 @@ export default function Home() {
             itemNo: value,
             price: m?.price ?? r.price,
             pcs: m?.pcs ?? r.pcs,
+            dimension: m?.dimension ?? r.dimension,
           };
         }
         return { ...r, [key]: value };
@@ -165,6 +173,22 @@ export default function Home() {
       const items = await readPriceSheet(file);
       setExcel(file.name);
       setPriceItems(items);
+      setRows((current) =>
+        current.map((row) => {
+          const match = items.find(
+            (item) =>
+              item.itemNo.toLowerCase() === row.itemNo.trim().toLowerCase(),
+          );
+          return match
+            ? {
+                ...row,
+                price: match.price || row.price,
+                pcs: match.pcs || row.pcs,
+                dimension: match.dimension || row.dimension,
+              }
+            : row;
+        }),
+      );
     } catch (error) {
       setExcel("");
       setPriceItems([]);
@@ -414,7 +438,15 @@ export default function Home() {
             form.append("itemNo", row.itemNo);
             form.append("price", row.price);
             form.append("pcs", row.pcs);
-            form.append("notes", row.notes);
+            const operatorNotes = [
+              row.notes,
+              row.dimension
+                ? `المقاس المعتمد من ملف الأسعار: ${row.dimension}`
+                : "",
+            ]
+              .filter(Boolean)
+              .join("\n");
+            form.append("notes", operatorNotes);
             form.append("promptTemplate", selectedPrompt?.content || "");
             form.append("generationModel", generationModel);
             return form;
@@ -618,7 +650,9 @@ export default function Home() {
                   <b>⇧</b>
                   <div>
                     <strong>{excel || "رفع ملف أسعار الدفعة"}</strong>
-                    <small>ITEM NO · PRICE · PCS/CTN</small>
+                    <small>
+                      ITEM NO · PRICE · PCS/CTN · المقاس (اختياري)
+                    </small>
                   </div>
                   <em>{excel ? `${priceItems.length} صنف` : "اختر ملف"}</em>
                 </label>
@@ -816,6 +850,15 @@ export default function Home() {
                               update(r.id, "pcs", e.target.value)
                             }
                             placeholder="0"
+                          />
+                        </Field>
+                        <Field label="المقاس (اختياري)">
+                          <input
+                            value={r.dimension}
+                            onChange={(e) =>
+                              update(r.id, "dimension", e.target.value)
+                            }
+                            placeholder="مثال: 34.5×22×20 سم"
                           />
                         </Field>
                         <Field label="تفاصيل إضافية" wide>
@@ -1165,6 +1208,17 @@ async function readPriceSheet(file: File): Promise<PriceItem[]> {
     "الشد",
     "شد الكرتون",
   ];
+  const dimensionAliases = [
+    "DIMENSION",
+    "DIMENSIONS",
+    "SIZE",
+    "PRODUCT SIZE",
+    "MEASUREMENT",
+    "المقاس",
+    "المقاسات",
+    "الأبعاد",
+    "ابعاد",
+  ];
   let headerIndex = -1;
   let bestScore = -1;
   for (let index = 0; index < Math.min(table.length, 25); index++) {
@@ -1183,6 +1237,7 @@ async function readPriceSheet(file: File): Promise<PriceItem[]> {
   let itemIndex = findColumn(headers, itemAliases);
   let priceIndex = findColumn(headers, priceAliases);
   let pcsIndex = findColumn(headers, pcsAliases);
+  const dimensionIndex = findColumn(headers, dimensionAliases);
   const populatedColumns = headers
     .map((cell, index) => (String(cell).trim() ? index : -1))
     .filter((index) => index >= 0);
@@ -1203,6 +1258,10 @@ async function readPriceSheet(file: File): Promise<PriceItem[]> {
       itemNo,
       price: String(row[priceIndex] ?? "").trim(),
       pcs: String(row[pcsIndex] ?? "").trim(),
+      dimension:
+        dimensionIndex >= 0
+          ? String(row[dimensionIndex] ?? "").trim()
+          : "",
     });
   }
   const items = [...unique.values()];
